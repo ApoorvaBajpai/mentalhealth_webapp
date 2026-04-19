@@ -112,7 +112,44 @@ export default function Results() {
                     <div style={{ width: 140 }} /> {/* spacer */}
                 </div>
 
-                {/* Score hero */}
+                {/* AI Model Source Badge */}
+                <div style={{
+                    display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 20,
+                    flexWrap: 'wrap'
+                }}>
+                    {results.source === 'model' ? (
+                        <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.35)',
+                            borderRadius: 999, padding: '6px 16px', fontSize: 13, fontWeight: 600,
+                            color: '#34d399'
+                        }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 8px #34d399' }} />
+                            AI Model Active — Real predictions from SVM + RoBERTa + BiLSTM
+                        </div>
+                    ) : (
+                        <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.35)',
+                            borderRadius: 999, padding: '6px 16px', fontSize: 13, fontWeight: 600,
+                            color: '#fbbf24'
+                        }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
+                            Simulation Mode — API not reachable, using score-based fallback
+                        </div>
+                    )}
+                    {results.source === 'model' && !results.model_agrees && (
+                        <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)',
+                            borderRadius: 999, padding: '6px 16px', fontSize: 13, fontWeight: 600,
+                            color: '#a78bfa'
+                        }}>
+                            Model diverged from PHQ-9 scoring: PHQ says "{results.phq_severity}" but AI predicts "{results.model_severity}"
+                        </div>
+                    )}
+                </div>
+
                 <div className="score-hero glass fade-up fade-up-delay-1"
                     style={{ background: info.bg, borderColor: info.border }}>
                     <div className="score-emoji">{info.emoji}</div>
@@ -136,22 +173,54 @@ export default function Results() {
                         label="Text Analysis"
                         value={results.text_confidence}
                         color="var(--clr-primary)"
+                        sub={`PHQ-9 score: ${results.phq9_score}/27`}
                     />
                     <ConfidenceCard
                         icon="📷"
                         label="Facial Analysis"
-                        value={results.facial_confidence}
+                        value={results.facial_available ? results.facial_confidence : null}
                         color="var(--clr-accent)"
+                        sub={results.facial_available
+                            ? `Dominant: ${results.dominant_emotion || '—'}`
+                            : 'No face detected'}
                     />
                     <ConfidenceCard
                         icon="🔀"
-                        label="Fusion Confidence"
-                        value={(results.text_confidence + results.facial_confidence) / 2}
+                        label="Fusion Score"
+                        value={results.facial_available
+                            ? (results.text_confidence * 0.6 + results.facial_confidence * 0.4)
+                            : results.text_confidence}
                         color={info.color}
+                        sub={results.facial_available ? '60% PHQ + 40% Face' : 'PHQ-9 only'}
                     />
                 </div>
 
-                {/* Chart */}
+                {/* Facial emotion detail card */}
+                {results.source === 'model' && (
+                    <div className="glass fade-up fade-up-delay-2" style={{
+                        borderRadius: 16, padding: '16px 20px', marginBottom: 20,
+                        display: 'flex', alignItems: 'flex-start', gap: 14,
+                        borderLeft: `3px solid ${results.facial_available ? '#818cf8' : '#475569'}`,
+                        fontSize: 13, color: 'var(--clr-text-muted, #94a3b8)'
+                    }}>
+                        <span style={{ fontSize: 22 }}>{results.facial_available ? '📷' : '⚠️'}</span>
+                        <div>
+                            <p style={{ fontWeight: 600, color: results.facial_available ? '#818cf8' : '#64748b', marginBottom: 4 }}>
+                                {results.facial_available
+                                    ? `Face detected — dominant expression: ${results.dominant_emotion}`
+                                    : 'Facial analysis not available'}
+                            </p>
+                            <p style={{ fontSize: 12, lineHeight: 1.5 }}>
+                                {results.facial_note}
+                            </p>
+                            {results.fusion_note && (
+                                <p style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
+                                    Fusion: {results.fusion_note}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <div className="glass results-chart-card fade-up fade-up-delay-3">
                     <h2 className="section-title">Severity Scale</h2>
                     <ResultsChart score={results.phq9_score} />
@@ -186,16 +255,21 @@ export default function Results() {
 
 /* ---- Sub-components ---- */
 
-function ConfidenceCard({ icon, label, value, color }) {
-    const pct = Math.round(value * 100)
+function ConfidenceCard({ icon, label, value, color, sub }) {
+    const unavailable = value === null || value === undefined
+    const pct = unavailable ? 0 : Math.round(Math.min(1, Math.max(0, value)) * 100)
     return (
         <div className="conf-card glass">
             <span className="conf-icon">{icon}</span>
             <p className="conf-label">{label}</p>
-            <p className="conf-value" style={{ color }}>{pct}%</p>
+            <p className="conf-value" style={{ color: unavailable ? '#475569' : color }}>
+                {unavailable ? '—' : `${pct}%`}
+            </p>
             <div className="progress-bar-track" style={{ marginTop: 8 }}>
-                <div className="progress-bar-fill" style={{ width: `${pct}%`, background: color }} />
+                <div className="progress-bar-fill"
+                    style={{ width: `${pct}%`, background: unavailable ? '#475569' : color }} />
             </div>
+            {sub && <p style={{ fontSize: 11, marginTop: 6, opacity: 0.6, textAlign: 'center' }}>{sub}</p>}
         </div>
     )
 }

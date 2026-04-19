@@ -39,8 +39,12 @@ export default function Processing() {
         const answers = JSON.parse(sessionStorage.getItem('phq9_answers') || '[]')
         const frames = JSON.parse(sessionStorage.getItem('facial_frames') || '[]')
 
+        // Use env variable in production (set VITE_API_URL in Vercel dashboard)
+        // Falls back to localhost:5000 for local development
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
         try {
-            const response = await fetch('http://localhost:8000/api/predict', {
+            const response = await fetch(`${API_BASE}/api/predict`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answers, facial_frames: frames })
@@ -48,21 +52,29 @@ export default function Processing() {
 
             if (response.ok) {
                 const data = await response.json()
+                // API response already matches webapp schema exactly
                 sessionStorage.setItem('results', JSON.stringify(data))
                 return
+            } else {
+                const err = await response.json().catch(() => ({}))
+                console.warn('API error:', err)
             }
         } catch (err) {
-            console.log('Backend not detected, using simulation mode.')
+            console.warn('Could not reach Flask API — using simulation mode.', err)
         }
 
-        // Fallback Mock Result
-        const mockScore = Math.floor(Math.random() * 27)
+        // Fallback: derive mock result from PHQ-9 answers
+        const phqScore = answers.reduce((s, v) => s + v, 0)
         sessionStorage.setItem('results', JSON.stringify({
-            phq9_score: mockScore,
+            phq9_score: phqScore,
             text_confidence: 0.88,
             facial_confidence: 0.76,
-            fusion_score: mockScore,
-            severity: getSeverity(mockScore),
+            fusion_score: phqScore,
+            severity: getSeverity(phqScore),
+            model_severity: getSeverity(phqScore),
+            phq_severity: getSeverity(phqScore),
+            source: 'simulation',   // flags this as fallback — not the real model
+            model_agrees: true,
         }))
     }
 
