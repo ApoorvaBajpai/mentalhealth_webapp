@@ -145,7 +145,7 @@ export default function Results() {
                             borderRadius: 999, padding: '6px 16px', fontSize: 13, fontWeight: 600,
                             color: '#a78bfa'
                         }}>
-                            Model diverged from PHQ-9 scoring: PHQ says "{results.phq_severity}" but AI predicts "{results.model_severity}"
+                            Model diverged: PHQ suggests "{results.phq_severity}" but AI predicts "{results.severity}"
                         </div>
                     )}
                 </div>
